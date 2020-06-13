@@ -5,9 +5,20 @@
 package it.polito.tdp.crimes;
 
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
 import java.util.ResourceBundle;
 
+import org.jgrapht.Graphs;
+
+import com.javadocmd.simplelatlng.LatLng;
+import com.javadocmd.simplelatlng.LatLngTool;
+import com.javadocmd.simplelatlng.util.LengthUnit;
+
 import it.polito.tdp.crimes.model.Model;
+import it.polito.tdp.crimes.model.Vertex;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
@@ -25,13 +36,13 @@ public class FXMLController {
     private URL location;
 
     @FXML // fx:id="boxAnno"
-    private ComboBox<?> boxAnno; // Value injected by FXMLLoader
+    private ComboBox<Integer> boxAnno; // Value injected by FXMLLoader
 
     @FXML // fx:id="boxMese"
-    private ComboBox<?> boxMese; // Value injected by FXMLLoader
+    private ComboBox<Integer> boxMese; // Value injected by FXMLLoader
 
     @FXML // fx:id="boxGiorno"
-    private ComboBox<?> boxGiorno; // Value injected by FXMLLoader
+    private ComboBox<Integer> boxGiorno; // Value injected by FXMLLoader
 
     @FXML // fx:id="btnCreaReteCittadina"
     private Button btnCreaReteCittadina; // Value injected by FXMLLoader
@@ -47,12 +58,64 @@ public class FXMLController {
 
     @FXML
     void doCreaReteCittadina(ActionEvent event) {
-
+    	txtResult.clear();
+    	Integer anno = boxAnno.getValue();
+    	if(anno==null) {
+    		txtResult.appendText("seleziona un anno");
+    		return;
+    	}
+    	this.model.creaGrafo(anno);
+    	for(final Vertex v : this.model.getGrafo().vertexSet()) {
+    		List<Vertex> lv = new ArrayList<>(Graphs.neighborListOf(this.model.getGrafo(), v));
+    		Collections.sort(lv, new Comparator<Vertex>() {
+    			public int compare(Vertex c1, Vertex c2) {
+    				if(LatLngTool.distance(new LatLng(v.getLat(), v.getLon()), new LatLng(c1.getLat(), c1.getLon()), LengthUnit.KILOMETER) > LatLngTool.distance(new LatLng(v.getLat(), v.getLon()), new LatLng(c2.getLat(), c2.getLon()), LengthUnit.KILOMETER)) {
+    					return 1;
+    				}
+    				else return -1;
+    			}
+    		});
+    		txtResult.appendText(v.getId()+": ");
+    		for(Vertex w : lv) {
+    			txtResult.appendText(w.getId()+", ");
+    		}
+    		txtResult.appendText("\n"+"\n");
+    	}
+    	btnSimula.setDisable(false);
     }
 
     @FXML
     void doSimula(ActionEvent event) {
-
+    	txtResult.clear();
+    	Integer anno = boxAnno.getValue();
+    	if(anno==null) {
+    		txtResult.appendText("seleziona un anno");
+    		return;
+    	}
+    	Integer mese = boxMese.getValue();
+    	if(mese==null) {
+    		txtResult.appendText("seleziona un mese");
+    		return;
+    	}
+    	Integer giorno = boxGiorno.getValue();
+    	if(giorno==null) {
+    		txtResult.appendText("seleziona un giorno");
+    		return;
+    	}
+    	Integer agenti = -1;
+    	try {
+    		agenti = Integer.parseInt(txtN.getText());
+    	}
+    	catch(Exception e) {
+    		txtResult.appendText("inserisci un numero tra 1 e 10");
+    	}
+    	if(agenti<1 || agenti>10) {
+    		txtResult.appendText("inserisci un numero tra 1 e 10");
+    		return;
+    	}
+    	this.model.getSim().init(agenti, anno, mese, giorno, this.model.getGrafo(), this.model.getDao().policeStation(anno), this.model.getDao().listAllEvents(anno, mese, giorno));
+    	this.model.getSim().run();
+    	txtResult.appendText("malgestiti: "+this.model.getSim().getMalgestiti());
     }
 
     @FXML // This method is called by the FXMLLoader when initialization is complete
@@ -69,5 +132,9 @@ public class FXMLController {
     
     public void setModel(Model model) {
     	this.model = model;
+    	boxAnno.getItems().addAll(this.model.getAnni());
+    	btnSimula.setDisable(true);
+    	boxMese.getItems().addAll(this.model.mesi());
+    	boxGiorno.getItems().addAll(this.model.giorni());
     }
 }
